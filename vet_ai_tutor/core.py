@@ -12,20 +12,36 @@ except ImportError:  # pragma: no cover
     from langchain.vectorstores import FAISS
 
 try:
+    from langchain_openai import OpenAIEmbeddings
+except ImportError:  # pragma: no cover
+    OpenAIEmbeddings = None  # type: ignore
+
+try:
     from langchain_community.embeddings import HuggingFaceEmbeddings
 except ImportError:  # pragma: no cover
     from langchain_huggingface import HuggingFaceEmbeddings
 
-from .config import EMBEDDING_MODEL, VECTOR_PATH
+from .config import EMBEDDING_MODEL, OPENAI_API_KEY, VECTOR_PATH
 
 
 class Tutor:
     """Simple retrieval-augmented tutoring class."""
 
-    def __init__(self, llm: Any = None, vector_path: str | os.PathLike[str] | None = None):
+    def __init__(
+        self,
+        llm: Any = None,
+        vector_path: str | os.PathLike[str] | None = None,
+        embeddings: Any = None,
+    ):
         self.llm = llm
         self.vector_path = str(Path(vector_path) if vector_path else VECTOR_PATH)
+        self.embeddings = embeddings or self._default_embeddings()
         self.db = self._load_vectorstore()
+
+    def _default_embeddings(self):
+        if OPENAI_API_KEY and OpenAIEmbeddings is not None:
+            return OpenAIEmbeddings(model="text-embedding-3-small", api_key=OPENAI_API_KEY)
+        return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
     def _load_vectorstore(self):
         if not os.path.exists(self.vector_path):
@@ -34,8 +50,7 @@ class Tutor:
                 "Run the build step first or upload the knowledge base."
             )
 
-        embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-        return FAISS.load_local(self.vector_path, embeddings, allow_dangerous_deserialization=True)
+        return FAISS.load_local(self.vector_path, self.embeddings, allow_dangerous_deserialization=True)
 
     def _format_context(self, docs: Iterable[Any]) -> str:
         return "\n\n".join(getattr(doc, "page_content", str(doc)) for doc in docs)
@@ -72,5 +87,5 @@ class Tutor:
         return None
 
 
-def build_tutor(llm: Any = None, vector_path: str | os.PathLike[str] | None = None) -> Tutor:
-    return Tutor(llm=llm, vector_path=vector_path)
+def build_tutor(llm: Any = None, vector_path: str | os.PathLike[str] | None = None, embeddings: Any = None) -> Tutor:
+    return Tutor(llm=llm, vector_path=vector_path, embeddings=embeddings)
