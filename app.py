@@ -33,7 +33,13 @@ from vet_ai_tutor.config import (
     VECTOR_PATH,
 )
 from vet_ai_tutor.core import Tutor
+import streamlit as st
+from langchain_openai import ChatOpenAI
 
+llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    api_key=st.secrets["OPENAI_API_KEY"]
+)
 
 @st.cache_resource
 def get_llm():
